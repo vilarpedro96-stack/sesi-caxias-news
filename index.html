@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/png" href="/sesi-logo.png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SESI CAXIAS NEWS - Portal Escolar</title>
+    <meta name="description" content="SESI CAXIAS NEWS é o portal de notícias da escola que mantém alunos, pais e professores informados com matérias, eventos, vídeos ao vivo e agenda escolar." />
+    <meta property="og:title" content="SESI CAXIAS NEWS - Portal Escolar" />
+    <meta property="og:description" content="SESI CAXIAS NEWS é o portal de notícias da escola que mantém alunos, pais e professores informados com matérias, eventos, vídeos ao vivo e agenda escolar." />
+    <meta property="og:type" content="website" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="SESI CAXIAS NEWS - Portal Escolar" />
+    <meta name="twitter:description" content="SESI CAXIAS NEWS é o portal de notícias da escola que mantém alunos, pais e professores informados com matérias, eventos, vídeos ao vivo e agenda escolar." />
+    <meta name="theme-color" content="#ffffff" />
+    <script>
+      (function() {
+        try {
+          var saved = localStorage.getItem('sesi-theme');
+          var isDark = saved === 'dark' || (!saved && window.matchMedia('(prefers-color-scheme: dark)').matches);
+          if (isDark) {
+            document.documentElement.classList.add('dark');
+            document.documentElement.setAttribute('data-theme', 'dark');
+            var meta = document.querySelector('meta[name="theme-color"]');
+            if (meta) meta.setAttribute('content', '#0a0a0a');
+          } else {
+            document.documentElement.classList.remove('dark');
+            document.documentElement.setAttribute('data-theme', 'light');
+          }
+        } catch (e) {}
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
+

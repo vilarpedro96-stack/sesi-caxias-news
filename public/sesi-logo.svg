@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200">
+  <defs>
+    <linearGradient id="sesiRedGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#E51A24" />
+      <stop offset="100%" stop-color="#B30D16" />
+    </linearGradient>
+    <radialGradient id="sesiGlow" cx="30%" cy="30%" r="70%">
+      <stop offset="0%" stop-color="#FF4D57" stop-opacity="0.8" />
+      <stop offset="100%" stop-color="#990B13" stop-opacity="1" />
+    </radialGradient>
+  </defs>
+  <circle cx="100" cy="100" r="96" fill="url(#sesiGlow)" />
+  <circle cx="100" cy="100" r="95" stroke="#FFFFFF" stroke-width="4" stroke-opacity="0.9" />
+  <ellipse cx="100" cy="100" rx="82" ry="32" stroke="#FFFFFF" stroke-width="2.5" stroke-dasharray="6 4" stroke-opacity="0.4" transform="rotate(-25 100 100)" />
+  <text x="100" y="108" text-anchor="middle" fill="#FFFFFF" font-size="48" font-weight="900" font-family="system-ui, -apple-system, sans-serif" letter-spacing="2">SESI</text>
+  <rect x="42" y="126" width="116" height="24" rx="12" fill="#FFFFFF" />
+  <text x="100" y="142" text-anchor="middle" fill="#B30D16" font-size="13" font-weight="800" font-family="system-ui, -apple-system, sans-serif" letter-spacing="2.5">CAXIAS</text>
+  <circle cx="152" cy="74" r="5" fill="#FEE2E2" />
+</svg>

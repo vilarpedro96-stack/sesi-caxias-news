@@ -1,0 +1,6 @@
+{
+  "name": "SESI CAXIAS NEWS",
+  "description": "Portal de notícias escolares SESI CAXIAS NEWS com agenda de eventos, vídeos e painel administrativo.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
