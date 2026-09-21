@@ -4,6 +4,7 @@ export interface Article {
   date: string;
   category: string;
   excerpt: string;
+  summary?: string;
   image: string;
   content?: string;
 }

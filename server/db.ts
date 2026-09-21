@@ -55,14 +55,17 @@ export async function initPostgresSchema(): Promise<void> {
       CREATE TABLE IF NOT EXISTS articles (
         id SERIAL PRIMARY KEY,
         title VARCHAR(255) NOT NULL,
-        summary TEXT NOT NULL,
-        content TEXT NOT NULL,
-        image TEXT NOT NULL,
+        summary TEXT NOT NULL DEFAULT '',
+        excerpt TEXT,
+        content TEXT NOT NULL DEFAULT '',
+        image TEXT NOT NULL DEFAULT '',
         category VARCHAR(100) NOT NULL DEFAULT 'Geral',
         date VARCHAR(100) NOT NULL,
         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
     `);
+    await pool.query(`ALTER TABLE articles ADD COLUMN IF NOT EXISTS excerpt TEXT;`);
+    await pool.query(`ALTER TABLE articles ADD COLUMN IF NOT EXISTS summary TEXT;`);
 
     // 2. Events
     await pool.query(`
@@ -79,8 +82,13 @@ export async function initPostgresSchema(): Promise<void> {
       );
     `);
     await pool.query(`ALTER TABLE events ADD COLUMN IF NOT EXISTS status VARCHAR(50) DEFAULT 'agendado';`);
-    await pool.query(`ALTER TABLE events ALTER COLUMN time DROP NOT NULL;`);
-    await pool.query(`ALTER TABLE events ALTER COLUMN location DROP NOT NULL;`);
+    await pool.query(`ALTER TABLE events ADD COLUMN IF NOT EXISTS time VARCHAR(100);`);
+    await pool.query(`ALTER TABLE events ADD COLUMN IF NOT EXISTS category VARCHAR(100) DEFAULT 'Geral';`);
+    await pool.query(`ALTER TABLE events ADD COLUMN IF NOT EXISTS description TEXT DEFAULT '';`);
+    try {
+      await pool.query(`ALTER TABLE events ALTER COLUMN time DROP NOT NULL;`);
+      await pool.query(`ALTER TABLE events ALTER COLUMN location DROP NOT NULL;`);
+    } catch {}
 
     // 3. Videos
     await pool.query(`
@@ -88,30 +96,42 @@ export async function initPostgresSchema(): Promise<void> {
         id SERIAL PRIMARY KEY,
         title VARCHAR(255) NOT NULL,
         url TEXT NOT NULL,
+        thumbnail TEXT,
         is_live BOOLEAN DEFAULT false,
         category VARCHAR(100) NOT NULL DEFAULT 'Geral',
         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
     `);
+    await pool.query(`ALTER TABLE videos ADD COLUMN IF NOT EXISTS thumbnail TEXT;`);
+    await pool.query(`ALTER TABLE videos ADD COLUMN IF NOT EXISTS is_live BOOLEAN DEFAULT false;`);
+    await pool.query(`ALTER TABLE videos ADD COLUMN IF NOT EXISTS category VARCHAR(100) DEFAULT 'Geral';`);
 
-    // 4. Admins
+    // 4. Admins — suporta tanto password quanto password_hash
     await pool.query(`
       CREATE TABLE IF NOT EXISTS admins (
         id SERIAL PRIMARY KEY,
         email VARCHAR(255) UNIQUE NOT NULL,
         role VARCHAR(50) NOT NULL DEFAULT 'admin',
         password VARCHAR(255),
+        password_hash TEXT,
         is_pending BOOLEAN NOT NULL DEFAULT true,
         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
     `);
+    await pool.query(`ALTER TABLE admins ADD COLUMN IF NOT EXISTS password VARCHAR(255);`);
+    await pool.query(`ALTER TABLE admins ADD COLUMN IF NOT EXISTS password_hash TEXT;`);
 
     // Seed default admin if table is empty
     const adminCheck = await pool.query('SELECT COUNT(*) FROM admins');
     if (parseInt(adminCheck.rows[0].count, 10) === 0) {
       await pool.query(`
-        INSERT INTO admins (email, role, password, is_pending)
-        VALUES ('admin@sesi.org.br', 'super_admin', 'admin123', false)
+        INSERT INTO admins (email, role, password, password_hash, is_pending)
+        VALUES ('coordenacao@sesi.edu.br', 'admin', 'admin', 'admin', false)
+        ON CONFLICT (email) DO NOTHING;
+      `);
+      await pool.query(`
+        INSERT INTO admins (email, role, password, password_hash, is_pending)
+        VALUES ('admin@sesi.edu.br', 'admin', NULL, NULL, true)
         ON CONFLICT (email) DO NOTHING;
       `);
     }

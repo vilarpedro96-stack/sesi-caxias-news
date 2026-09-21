@@ -3,7 +3,6 @@ import cors from 'cors';
 import path from 'path';
 import fs from 'fs';
 import dotenv from 'dotenv';
-import { createServer as createViteServer } from 'vite';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { getPostgresPool, initPostgresSchema, seedEventsIfEmpty, ensurePostgresReady } from './server/db.js';
 
@@ -19,8 +18,10 @@ app.use(express.static(path.join(process.cwd(), 'public')));
 // Serverless / cold-start DB ready middleware for API routes
 app.use('/api', async (req, res, next) => {
   try {
-    ensurePostgresReady(fallbackEvents).catch(() => {});
-  } catch {}
+    await ensurePostgresReady(fallbackEvents);
+  } catch {
+    // segue mesmo se o banco ainda nao estiver pronto
+  }
   next();
 });
 
@@ -655,6 +656,7 @@ let fallbackAdmins = [
 // 1. API: STATUS & DATABASE INFO
 // ==========================================
 app.get('/api/status', async (req, res) => {
+  try {
   const pg = getPostgresPool();
   if (pg) {
     try {
@@ -714,6 +716,17 @@ app.get('/api/status', async (req, res) => {
       error: errorMsg
     }
   });
+  } catch (e: any) {
+    return res.json({
+      status: 'ok',
+      database: {
+        type: 'in-memory',
+        configured: false,
+        connected: false,
+        error: e?.message || 'status check failed'
+      }
+    });
+  }
 });
 
 // ==========================================
@@ -775,9 +788,9 @@ app.post('/api/articles', async (req, res) => {
   if (pg) {
     try {
       const result = await pg.query(
-        `INSERT INTO articles (title, summary, content, image, category, date)
-         VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
-        [newArticle.title, newArticle.summary, newArticle.content, newArticle.image, newArticle.category, newArticle.date]
+        `INSERT INTO articles (title, summary, excerpt, content, image, category, date)
+         VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
+        [newArticle.title, newArticle.summary, newArticle.summary, newArticle.content, newArticle.image, newArticle.category, newArticle.date]
       );
       if (result.rows && result.rows[0]) {
         return res.status(201).json(result.rows[0]);
@@ -969,6 +982,7 @@ app.get('/api/videos', async (req, res) => {
           id: v.id,
           title: v.title,
           url: v.url,
+          thumbnail: v.thumbnail || '',
           isLive: v.is_live ?? v.isLive ?? false,
           category: v.category
         }));
@@ -1005,7 +1019,7 @@ app.get('/api/videos', async (req, res) => {
 });
 
 app.post('/api/videos', async (req, res) => {
-  const { title, url, isLive, category } = req.body;
+  const { title, url, isLive, category, thumbnail } = req.body;
   if (!title || !url) {
     return res.status(400).json({ error: 'Title and URL are required' });
   }
@@ -1014,9 +1028,9 @@ app.post('/api/videos', async (req, res) => {
   if (pg) {
     try {
       const result = await pg.query(
-        `INSERT INTO videos (title, url, is_live, category)
-         VALUES ($1, $2, $3, $4) RETURNING *`,
-        [title, url, Boolean(isLive), category || 'Geral']
+        `INSERT INTO videos (title, url, is_live, category, thumbnail)
+         VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+        [title, url, Boolean(isLive), category || 'Geral', thumbnail || '']
       );
       if (result.rows && result.rows[0]) {
         const v = result.rows[0];
@@ -1024,6 +1038,7 @@ app.post('/api/videos', async (req, res) => {
           id: v.id,
           title: v.title,
           url: v.url,
+          thumbnail: v.thumbnail || thumbnail || '',
           isLive: v.is_live,
           category: v.category
         });
@@ -1159,13 +1174,14 @@ app.post('/api/admins/login', async (req, res) => {
       const { rows } = await pg.query('SELECT * FROM admins WHERE LOWER(email) = $1 LIMIT 1', [cleanEmail]);
       if (rows && rows.length > 0) {
         const data = rows[0];
-        if (data.is_pending || !data.password) {
+        const storedPassword = data.password || data.password_hash || null;
+        if (!storedPassword) {
           return res.json({
             isPending: true,
             admin: { id: data.id, email: data.email, role: data.role, isPending: true }
           });
         }
-        if (data.password === password) {
+        if (storedPassword === password) {
           return res.json({
             isPending: false,
             admin: { id: data.id, email: data.email, role: data.role, isPending: false }
@@ -1189,14 +1205,15 @@ app.post('/api/admins/login', async (req, res) => {
         .single();
 
       if (!error && data) {
-        if (data.is_pending || !data.password) {
+        const storedPassword = data.password || data.password_hash || null;
+        if (!storedPassword) {
           return res.json({
             isPending: true,
             admin: { id: data.id, email: data.email, role: data.role, isPending: true }
           });
         }
 
-        if (data.password === password) {
+        if (storedPassword === password) {
           return res.json({
             isPending: false,
             admin: { id: data.id, email: data.email, role: data.role, isPending: false }
@@ -1243,7 +1260,7 @@ app.post('/api/admins/setup-password', async (req, res) => {
   if (pg) {
     try {
       const result = await pg.query(
-        'UPDATE admins SET password = $1, is_pending = false WHERE id = $2 RETURNING id, email, role',
+        'UPDATE admins SET password = $1, password_hash = $1, is_pending = false WHERE id = $2 RETURNING id, email, role',
         [password, adminId]
       );
       if (result.rows && result.rows[0]) {
@@ -1305,8 +1322,8 @@ app.post('/api/admins', async (req, res) => {
   if (pg) {
     try {
       const result = await pg.query(
-        'INSERT INTO admins (email, role, is_pending, password) VALUES ($1, $2, $3, $4) RETURNING id, email, role, is_pending',
-        [cleanEmail, 'admin', true, null]
+        'INSERT INTO admins (email, role, is_pending, password, password_hash) VALUES ($1, $2, $3, $4, $5) RETURNING id, email, role, is_pending',
+        [cleanEmail, 'admin', true, null, null]
       );
       if (result.rows && result.rows[0]) {
         const data = result.rows[0];
@@ -1434,6 +1451,7 @@ app.get('/api/logo/download', (req, res) => {
 // ==========================================
 async function startServer() {
   if (process.env.NODE_ENV !== 'production') {
+    const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: 'spa',

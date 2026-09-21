@@ -160,14 +160,7 @@ export default function App() {
       const created = await apiService.addArticle(newArticle);
       setArticles((prev) => [created, ...prev.filter((a) => a.id !== created.id)]);
     } catch (e) {
-      const nextId = articles.length > 0 ? Math.max(...articles.map((a) => a.id)) + 1 : 1;
-      setArticles([
-        {
-          ...newArticle,
-          id: nextId
-        },
-        ...articles
-      ]);
+      toast.error('Nao foi possivel salvar a noticia no banco. Tente de novo.');
     }
   };
 
@@ -186,14 +179,7 @@ export default function App() {
       const created = await apiService.addEvent(newEvent);
       setEvents((prev) => [...prev, created]);
     } catch (e) {
-      const nextId = events.length > 0 ? Math.max(...events.map((e) => e.id)) + 1 : 1;
-      setEvents([
-        ...events,
-        {
-          ...newEvent,
-          id: nextId
-        }
-      ]);
+      toast.error('Nao foi possivel salvar o evento no banco. Tente de novo.');
     }
   };
 
@@ -212,14 +198,7 @@ export default function App() {
       const created = await apiService.addVideo(newVideo);
       setVideos((prev) => [created, ...prev.filter((v) => v.id !== created.id)]);
     } catch (e) {
-      const nextId = videos.length > 0 ? Math.max(...videos.map((v) => v.id)) + 1 : 1;
-      setVideos([
-        {
-          ...newVideo,
-          id: nextId
-        },
-        ...videos
-      ]);
+      toast.error('Nao foi possivel salvar o video no banco. Tente de novo.');
     }
   };
 
@@ -238,17 +217,7 @@ export default function App() {
       const created = await apiService.addAdmin(email);
       setAdmins((prev) => [...prev, created]);
     } catch (e) {
-      const nextId = admins.length > 0 ? Math.max(...admins.map((a) => a.id)) + 1 : 1;
-      setAdmins([
-        ...admins,
-        {
-          id: nextId,
-          email,
-          role: 'admin',
-          password: null,
-          isPending: true
-        }
-      ]);
+      toast.error('Nao foi possivel salvar o admin no banco. Tente de novo.');
     }
   };
 
