@@ -18,6 +18,8 @@ import { Article, SchoolEvent, VideoItem, AdminUser } from '../types';
 import { apiService } from '../services/api';
 import { SesiLogo } from './SesiLogo';
 import { useTheme } from '../context/ThemeContext';
+import { getEventCountdown, isEventEnded, parseLocalDate } from '../utils/eventCountdown';
+import { useLiveNow } from '../hooks/useLiveNow';
 
 interface AdminDashboardProps {
   currentAdmin: AdminUser;
@@ -55,6 +57,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   onRefreshData
 }) => {
   const { theme, toggleTheme } = useTheme();
+  const now = useLiveNow();
   const [activeTab, setActiveTab] = useState<'news' | 'events' | 'videos' | 'admins'>('news');
 
   // Database status state
@@ -541,13 +544,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               </h3>
               <div className="space-y-3">
                 {events.map((evt) => {
-                  const dateObj = new Date(evt.date);
+                  const dateObj = parseLocalDate(evt.date) || new Date(evt.date);
                   const monthName = !isNaN(dateObj.getTime())
                     ? dateObj.toLocaleDateString('pt-BR', { month: 'short' })
                     : 'EVT';
                   const dayNum = !isNaN(dateObj.getTime()) ? dateObj.getDate() : '•';
 
-                  const isEncerrado = evt.status === 'encerrado' || (!evt.status && new Date(evt.date).getTime() <= new Date('2026-09-16T23:59:59').getTime());
+                  const isEncerrado = isEventEnded(evt.date, evt.status, now);
+                  const countdown = getEventCountdown(evt.date, now);
 
                   return (
                     <div
@@ -577,11 +581,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                               <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full bg-gray-100 dark:bg-neutral-800 text-gray-700 dark:text-neutral-300 border border-gray-300 dark:border-neutral-700">
                                 Encerrado
                               </span>
-                            ) : (
-                              <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/40">
-                                Agendado
+                            ) : countdown ? (
+                              <span className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded-full ${countdown.class}`}>
+                                {countdown.label}
                               </span>
-                            )}
+                            ) : null}
                           </div>
                           <div className="text-gray-600 dark:text-neutral-300 text-xs flex flex-wrap gap-3 items-center mt-1">
                             {evt.time && (

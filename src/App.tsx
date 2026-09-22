@@ -25,53 +25,27 @@ export default function App() {
   const [selectedArticle, setSelectedArticle] = useState<Article | null>(null);
   const [currentAdmin, setCurrentAdmin] = useState<AdminUser | null>(null);
 
-  // States
-  const [articles, setArticles] = useState<Article[]>(() => {
-    try {
-      const saved = localStorage.getItem('sesi_news_articles');
-      return saved ? JSON.parse(saved) : INITIAL_ARTICLES;
-    } catch {
-      return INITIAL_ARTICLES;
-    }
-  });
+  const [usingNeon, setUsingNeon] = useState(false);
+  const [articles, setArticles] = useState<Article[]>(INITIAL_ARTICLES);
+  const [events, setEvents] = useState<SchoolEvent[]>(INITIAL_EVENTS);
+  const [videos, setVideos] = useState<VideoItem[]>(INITIAL_VIDEOS);
+  const [admins, setAdmins] = useState<AdminUser[]>(INITIAL_ADMINS);
 
-  const [events, setEvents] = useState<SchoolEvent[]>(() => {
+  const readCache = <T,>(key: string, fallback: T): T => {
     try {
-      const saved = localStorage.getItem('sesi_news_events_v2');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length >= 20) {
-          return parsed;
-        }
-      }
-      localStorage.setItem('sesi_news_events_v2', JSON.stringify(INITIAL_EVENTS));
-      return INITIAL_EVENTS;
+      const saved = localStorage.getItem(key);
+      return saved ? (JSON.parse(saved) as T) : fallback;
     } catch {
-      return INITIAL_EVENTS;
+      return fallback;
     }
-  });
+  };
 
-  const [videos, setVideos] = useState<VideoItem[]>(() => {
-    try {
-      const saved = localStorage.getItem('sesi_news_videos');
-      return saved ? JSON.parse(saved) : INITIAL_VIDEOS;
-    } catch {
-      return INITIAL_VIDEOS;
-    }
-  });
-
-  const [admins, setAdmins] = useState<AdminUser[]>(() => {
-    try {
-      const saved = localStorage.getItem('sesi_news_admins');
-      return saved ? JSON.parse(saved) : INITIAL_ADMINS;
-    } catch {
-      return INITIAL_ADMINS;
-    }
-  });
-
-  // Fetch initial data from Backend API
   const refreshAllData = async () => {
     try {
+      const status = await apiService.getStatus();
+      const neonOk = Boolean(status.database?.connected);
+      setUsingNeon(neonOk);
+
       const [fetchedArticles, fetchedEvents, fetchedVideos, fetchedAdmins] = await Promise.allSettled([
         apiService.getArticles(),
         apiService.getEvents(),
@@ -79,20 +53,33 @@ export default function App() {
         apiService.getAdmins()
       ]);
 
-      if (fetchedArticles.status === 'fulfilled' && fetchedArticles.value.length > 0) {
+      if (fetchedArticles.status === 'fulfilled') {
         setArticles(fetchedArticles.value);
+      } else if (!neonOk) {
+        setArticles(readCache('sesi_news_articles', INITIAL_ARTICLES));
       }
-      if (fetchedEvents.status === 'fulfilled' && fetchedEvents.value.length > 0) {
+      if (fetchedEvents.status === 'fulfilled') {
         setEvents(fetchedEvents.value);
+      } else if (!neonOk) {
+        setEvents(readCache('sesi_news_events_v2', INITIAL_EVENTS));
       }
-      if (fetchedVideos.status === 'fulfilled' && fetchedVideos.value.length > 0) {
+      if (fetchedVideos.status === 'fulfilled') {
         setVideos(fetchedVideos.value);
+      } else if (!neonOk) {
+        setVideos(readCache('sesi_news_videos', INITIAL_VIDEOS));
       }
-      if (fetchedAdmins.status === 'fulfilled' && fetchedAdmins.value.length > 0) {
+      if (fetchedAdmins.status === 'fulfilled') {
         setAdmins(fetchedAdmins.value);
+      } else if (!neonOk) {
+        setAdmins(readCache('sesi_news_admins', INITIAL_ADMINS));
       }
     } catch (e) {
       console.warn('Could not sync with backend on startup:', e);
+      setUsingNeon(false);
+      setArticles(readCache('sesi_news_articles', INITIAL_ARTICLES));
+      setEvents(readCache('sesi_news_events_v2', INITIAL_EVENTS));
+      setVideos(readCache('sesi_news_videos', INITIAL_VIDEOS));
+      setAdmins(readCache('sesi_news_admins', INITIAL_ADMINS));
     }
   };
 
@@ -100,22 +87,25 @@ export default function App() {
     refreshAllData();
   }, []);
 
-  // Sync state changes with localStorage as offline cache
   useEffect(() => {
+    if (usingNeon) return;
     localStorage.setItem('sesi_news_articles', JSON.stringify(articles));
-  }, [articles]);
+  }, [articles, usingNeon]);
 
   useEffect(() => {
+    if (usingNeon) return;
     localStorage.setItem('sesi_news_events_v2', JSON.stringify(events));
-  }, [events]);
+  }, [events, usingNeon]);
 
   useEffect(() => {
+    if (usingNeon) return;
     localStorage.setItem('sesi_news_videos', JSON.stringify(videos));
-  }, [videos]);
+  }, [videos, usingNeon]);
 
   useEffect(() => {
+    if (usingNeon) return;
     localStorage.setItem('sesi_news_admins', JSON.stringify(admins));
-  }, [admins]);
+  }, [admins, usingNeon]);
 
   // Navigation handlers
   const handleHomeClick = () => {

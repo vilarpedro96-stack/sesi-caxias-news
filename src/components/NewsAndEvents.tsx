@@ -1,4 +1,6 @@
 import React, { useState, useMemo } from 'react';
+import { useLiveNow } from '../hooks/useLiveNow';
+import { getEventCountdown, isEventEnded, parseLocalDate } from '../utils/eventCountdown';
 import { motion } from 'motion/react';
 import {
   Calendar as CalendarIcon,
@@ -28,6 +30,7 @@ export const NewsAndEvents: React.FC<NewsAndEventsProps> = ({
   onCalendarClick
 }) => {
   const [selectedCategory, setSelectedCategory] = useState<string>('Todas');
+  const now = useLiveNow();
 
   // Extract unique categories
   const categories = useMemo(() => {
@@ -48,35 +51,10 @@ export const NewsAndEvents: React.FC<NewsAndEventsProps> = ({
     );
   }, [articles, selectedCategory]);
 
-  // Safe local date parser avoiding UTC midnight timezone shifts
-  const parseLocalDate = (dateStr: string) => {
-    if (!dateStr) return null;
-    const parts = dateStr.split('-');
-    if (parts.length === 3) {
-      const y = parseInt(parts[0], 10);
-      const m = parseInt(parts[1], 10) - 1;
-      const d = parseInt(parts[2], 10);
-      return new Date(y, m, d);
-    }
-    const d = new Date(dateStr);
-    return isNaN(d.getTime()) ? null : d;
-  };
-
-  // Upcoming events (top 4 active, automatically excludes ended events)
   const displayEvents = useMemo(() => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    const valid = (events || []).filter((event) => {
-      if (event.status === 'encerrado') return false;
-      const eventDate = parseLocalDate(event.date);
-      if (!eventDate) return false;
-      eventDate.setHours(23, 59, 59, 999);
-      // Automatically active until the end of the event day
-      return eventDate >= today;
-    });
-    return (valid.length > 0 ? valid : events || []).slice(0, 4);
-  }, [events]);
+    const valid = (events || []).filter((event) => !isEventEnded(event.date, event.status, now));
+    return valid.slice(0, 4);
+  }, [events, now]);
 
   // Helper to construct Google Calendar Add Event URL
   const getGoogleCalendarUrl = (evt: SchoolEvent) => {
@@ -97,23 +75,7 @@ export const NewsAndEvents: React.FC<NewsAndEventsProps> = ({
     return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&details=${details}&location=${location}${dateStr ? `&dates=${dateStr}` : ''}`;
   };
 
-  // Helper for dynamic countdown badge (decrements each day automatically)
-  const getEventTimeStatus = (dateStr: string) => {
-    const eventDay = parseLocalDate(dateStr);
-    if (!eventDay) return null;
-
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    eventDay.setHours(0, 0, 0, 0);
-
-    const diffDays = Math.round((eventDay.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-
-    if (diffDays < 0) return { label: 'Encerrado', class: 'bg-neutral-200 dark:bg-neutral-800 text-neutral-800 dark:text-neutral-200 border border-neutral-300 dark:border-neutral-700' };
-    if (diffDays === 0) return { label: 'Hoje', class: 'bg-red-600 text-white font-black animate-pulse shadow-sm shadow-red-600/40' };
-    if (diffDays === 1) return { label: 'Amanhã', class: 'bg-amber-500 text-white font-bold shadow-sm' };
-    if (diffDays > 1 && diffDays <= 7) return { label: `Em ${diffDays} dias`, class: 'bg-emerald-600 text-white font-bold shadow-sm' };
-    return { label: 'Em breve', class: 'bg-neutral-200 dark:bg-neutral-800 text-neutral-800 dark:text-neutral-200 border border-neutral-300 dark:border-neutral-700' };
-  };
+  const getEventTimeStatus = (dateStr: string) => getEventCountdown(dateStr, now);
 
   return (
     <div id="portal-main-feed" className="bg-neutral-50 dark:bg-neutral-950 transition-colors duration-200">
@@ -263,7 +225,7 @@ export const NewsAndEvents: React.FC<NewsAndEventsProps> = ({
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
               {displayEvents.map((evt) => {
-                const evtDate = new Date(evt.date);
+                const evtDate = parseLocalDate(evt.date) || new Date(evt.date);
                 const monthName = !isNaN(evtDate.getTime())
                   ? evtDate.toLocaleDateString('pt-BR', { month: 'short' }).replace('.', '').toUpperCase()
                   : 'EVT';

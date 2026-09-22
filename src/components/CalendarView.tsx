@@ -1,4 +1,6 @@
 import React, { useState, useMemo } from 'react';
+import { useLiveNow } from '../hooks/useLiveNow';
+import { getEventCountdown, isEventEnded, parseLocalDate } from '../utils/eventCountdown';
 import { motion } from 'motion/react';
 import {
   ArrowLeft,
@@ -23,40 +25,14 @@ interface CalendarViewProps {
 export const CalendarView: React.FC<CalendarViewProps> = ({ events, onBack }) => {
   const [filterType, setFilterType] = useState<'all' | 'upcoming' | 'past'>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
-
+  const now = useLiveNow();
   const today = useMemo(() => {
-    const t = new Date();
+    const t = new Date(now);
     t.setHours(0, 0, 0, 0);
     return t;
-  }, []);
+  }, [now]);
 
-  // Safe local date parser avoiding UTC midnight timezone shifts
-  const parseLocalDate = (dateStr: string) => {
-    if (!dateStr) return null;
-    const parts = dateStr.split('-');
-    if (parts.length === 3) {
-      const y = parseInt(parts[0], 10);
-      const m = parseInt(parts[1], 10) - 1;
-      const d = parseInt(parts[2], 10);
-      return new Date(y, m, d);
-    }
-    const d = new Date(dateStr);
-    return isNaN(d.getTime()) ? null : d;
-  };
-
-  // Automatically closes when the day ends (at midnight) or if manually marked
-  const isEventEncerrado = useMemo(() => {
-    return (evt: SchoolEvent) => {
-      if (evt.status === 'encerrado') return true;
-      const evtDate = parseLocalDate(evt.date);
-      if (evtDate) {
-        // Until 23:59:59 of the event day, it remains active. When midnight arrives, it automatically closes.
-        evtDate.setHours(23, 59, 59, 999);
-        return evtDate < new Date();
-      }
-      return false;
-    };
-  }, []);
+  const isEventEncerrado = (evt: SchoolEvent) => isEventEnded(evt.date, evt.status, now);
 
   const { upcomingCount, pastCount } = useMemo(() => {
     let up = 0;
@@ -69,12 +45,16 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ events, onBack }) =>
       }
     });
     return { upcomingCount: up, pastCount: past };
-  }, [events, isEventEncerrado]);
+  }, [events, now]);
 
   // Filter events based on active tab and query
   const filteredEvents = useMemo(() => {
     return [...events]
-      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+      .sort((a, b) => {
+        const da = parseLocalDate(a.date)?.getTime() ?? new Date(a.date).getTime();
+        const db = parseLocalDate(b.date)?.getTime() ?? new Date(b.date).getTime();
+        return da - db;
+      })
       .filter((evt) => {
         const isEncerrado = isEventEncerrado(evt);
 
@@ -94,12 +74,12 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ events, onBack }) =>
 
         return true;
       });
-  }, [events, filterType, searchQuery, isEventEncerrado]);
+  }, [events, filterType, searchQuery, now]);
 
   // Group filtered events by month + year
   const groupedEvents = useMemo(() => {
     return filteredEvents.reduce<Record<string, SchoolEvent[]>>((acc, event) => {
-      const dateObj = new Date(event.date);
+      const dateObj = parseLocalDate(event.date) || new Date(event.date);
       let monthLabel = 'Outras Datas';
       if (!isNaN(dateObj.getTime())) {
         const str = dateObj.toLocaleDateString('pt-BR', {
@@ -269,6 +249,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ events, onBack }) =>
                 {monthEvents.map((evt) => {
                   const evtDate = parseLocalDate(evt.date);
                   const isPast = isEventEncerrado(evt);
+                  const countdown = getEventCountdown(evt.date, now);
                   const dayNum = evtDate ? evtDate.getDate() : '•';
                   const weekday = evtDate
                     ? evtDate
@@ -312,12 +293,12 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ events, onBack }) =>
                                 <CheckCircle2 size={11} className="text-neutral-500 dark:text-neutral-400" />
                                 Encerrado
                               </span>
-                            ) : (
-                              <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700 font-bold">
-                                <Sparkles size={10} className="text-emerald-600 dark:text-emerald-400" />
-                                Confirmado
+                            ) : countdown ? (
+                              <span className={`inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full ${countdown.class}`}>
+                                <Sparkles size={10} />
+                                {countdown.label}
                               </span>
-                            )}
+                            ) : null}
                           </div>
 
                           {evt.description && (
