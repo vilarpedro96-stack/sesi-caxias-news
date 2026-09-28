@@ -81,6 +81,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   const [eventTitle, setEventTitle] = useState('');
   const [eventDate, setEventDate] = useState('');
+  const [eventEndDate, setEventEndDate] = useState('');
   const [eventTime, setEventTime] = useState('');
   const [eventDescription, setEventDescription] = useState('');
 
@@ -145,6 +146,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     onAddEvent({
       title: eventTitle,
       date: eventDate,
+      endDate: eventEndDate || undefined,
       time: eventTime.trim() || undefined,
       description: eventDescription.trim() || undefined,
       location: eventDescription.trim() || undefined
@@ -152,6 +154,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
     setEventTitle('');
     setEventDate('');
+    setEventEndDate('');
     setEventTime('');
     setEventDescription('');
     toast.success('Evento agendado com sucesso!');
@@ -503,6 +506,18 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
                 <div>
                   <label className="block text-xs font-semibold text-gray-700 dark:text-neutral-300 uppercase mb-1">
+                    Data final (opcional)
+                  </label>
+                  <input
+                    type="date"
+                    value={eventEndDate}
+                    onChange={(e) => setEventEndDate(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-neutral-700 rounded-lg text-sm focus:ring-2 focus:ring-red-500 outline-none bg-white dark:bg-neutral-800 text-gray-900 dark:text-neutral-100"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 dark:text-neutral-300 uppercase mb-1">
                     Horário (opcional)
                   </label>
                   <input
@@ -550,8 +565,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     : 'EVT';
                   const dayNum = !isNaN(dateObj.getTime()) ? dateObj.getDate() : '•';
 
-                  const isEncerrado = isEventEnded(evt.date, evt.status, now);
-                  const countdown = getEventCountdown(evt.date, now);
+                  const isEncerrado = isEventEnded(evt.date, evt.status, now, evt.endDate);
+                  const countdown = getEventCountdown(evt.date, now, evt.endDate);
 
                   return (
                     <div

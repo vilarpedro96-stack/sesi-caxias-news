@@ -65,6 +65,7 @@ function mapEvent(row: any) {
     id: row.id,
     title: row.title,
     date: row.date,
+    endDate: row.end_date || undefined,
     time: row.time || undefined,
     description: row.description || '',
     location: row.location || '',
@@ -164,6 +165,7 @@ async function ensureSchema() {
         ALTER TABLE events ADD COLUMN IF NOT EXISTS category TEXT DEFAULT 'Geral';
         ALTER TABLE events ADD COLUMN IF NOT EXISTS description TEXT;
         ALTER TABLE events ADD COLUMN IF NOT EXISTS location TEXT;
+        ALTER TABLE events ADD COLUMN IF NOT EXISTS end_date TEXT;
 
         CREATE TABLE IF NOT EXISTS videos (
           id SERIAL PRIMARY KEY,
@@ -203,6 +205,71 @@ async function ensureSchema() {
            ON CONFLICT (email) DO NOTHING`
         );
       }
+
+      const existingEvents = await pg.query('SELECT title, date FROM events');
+      const existingKeys = new Set(
+        existingEvents.rows.map((row: any) => `${String(row.title).trim().toLowerCase()}|${row.date}`)
+      );
+      const calendar = [
+          ['Retorno às aulas após o recesso escolar', '2026-08-03', null, null, 'Escola FIRJAN SESI Duque de Caxias', 'Retorno de todos os estudantes e equipe pedagógica para o 2º semestre letivo.'],
+          ['Provas do 2º Trimestre', '2026-08-10', '2026-08-14', null, 'Salas de Aula', 'Semana de avaliações e provas do 2º Trimestre (10 a 14/08).'],
+          ['Interclasses – Anos Iniciais', '2026-08-24', '2026-08-25', null, 'Ginásio Poliesportivo', 'Jogos esportivos Interclasses para os Anos Iniciais (24 e 25/08).'],
+          ['Interclasses – Anos Finais', '2026-08-26', '2026-08-27', null, 'Ginásio Poliesportivo', 'Competições esportivas Interclasses para turmas dos Anos Finais (26 e 27/08).'],
+          ['Passeio FESTMAT (Medalhistas Canguru + Integrantes MOB)', '2026-08-28', null, null, 'FESTMAT', 'Passeio cultural e pedagógico FESTMAT para medalhistas do Concurso Canguru e MOB.'],
+          ['Recuperação Paralela – 2º Trimestre', '2026-08-31', '2026-09-04', null, 'Escola FIRJAN SESI', 'Aulas de reforço e avaliações de recuperação paralela (31/08 a 04/09).'],
+          ['Interclasses – Ensino Médio', '2026-08-31', '2026-09-01', null, 'Ginásio Poliesportivo', 'Torneios esportivos Interclasses para o Ensino Médio (31/08 e 01/09).'],
+          ['Término do 2º Trimestre', '2026-09-04', null, null, 'Escola FIRJAN SESI', 'Encerramento oficial das notas e atividades do 2º trimestre letivo.'],
+          ['Feriado Nacional – Independência do Brasil', '2026-09-07', null, null, 'Feriado Nacional', 'Comemoração da Independência do Brasil (sem expediente escolar).'],
+          ['Início do 3º Trimestre', '2026-09-08', null, null, 'Escola FIRJAN SESI', 'Abertura das aulas e conteúdos pedagógicos do 3º trimestre.'],
+          ['Conselho de Classe – 2º Trimestre (Anos Iniciais)', '2026-09-09', null, null, 'Sala dos Professores', 'Reunião de avaliação do rendimento escolar dos Anos Iniciais.'],
+          ['1ª Fase da Olimpíada de Português BÊ-Á-BÁ (Anos Iniciais)', '2026-09-10', null, null, 'Salas de Aula', 'Aplicação das provas da 1ª fase da Olimpíada de Português BÊ-Á-BÁ.'],
+          ['Conselho de Classe – 2º Trimestre (Ensino Médio)', '2026-09-14', null, null, 'Sala dos Professores', 'Reunião do corpo docente para fechamento pedagógico do Ensino Médio.'],
+          ['Setembro Amarelo (Teatro FIRJAN SESI)', '2026-09-15', null, null, 'Teatro FIRJAN SESI', 'Palestras e dinâmicas de valorização da vida e saúde socioemocional.'],
+          ['Conselho de Classe – 2º Trimestre (Anos Finais)', '2026-09-16', null, null, 'Sala dos Professores', 'Reunião de avaliação de desempenho dos alunos dos Anos Finais.'],
+          ['Escola Aberta (Anos Iniciais – TARDE)', '2026-09-21', null, 'Turno da Tarde', 'Escola FIRJAN SESI Duque de Caxias', 'Visitação, oficinas e integração das famílias dos alunos dos Anos Iniciais.'],
+          ['Escola Aberta (Anos Iniciais – MANHÃ)', '2026-09-22', null, 'Turno da Manhã', 'Escola FIRJAN SESI Duque de Caxias', 'Visitação, oficinas e integração das famílias dos alunos dos Anos Iniciais.'],
+          ['Escola Aberta (Anos Finais e Ensino Médio)', '2026-09-23', '2026-09-25', 'Manhã e Tarde', 'Escola FIRJAN SESI Duque de Caxias', 'Dias de integração e vivência com as turmas de Anos Finais e Ensino Médio (23 e 25/09).'],
+          ['Aulão UERJ (Teatro FIRJAN SESI)', '2026-09-24', null, '14:00 - 18:00', 'Teatro FIRJAN SESI', 'Super revisão preparatória interdisciplinar com foco no Vestibular Estadual da UERJ.'],
+          ['Encontro da Família', '2026-09-26', null, '08:30 - 12:30', 'Escola FIRJAN SESI', 'Dia especial dedicado à aproximação, acolhimento e atividades entre família e escola.'],
+          ['Avaliações Diversificadas (Testes Anos Iniciais e Finais)', '2026-09-28', '2026-10-02', null, 'Salas de Aula', 'Semana de aplicação de avaliações diversificadas e testes (28/09 a 02/10).'],
+          ['1ª Fase da Olimpíada de Português BÊ-Á-BÁ (Anos Iniciais)', '2026-10-03', null, null, 'Salas de Aula', 'Etapa complementar da Olimpíada de Português BÊ-Á-BÁ para os Anos Iniciais.'],
+          ['Feriado Nacional – Nossa Senhora Aparecida', '2026-10-12', null, null, 'Feriado Nacional', 'Feriado Nacional de Nossa Senhora Aparecida e Dia das Crianças.'],
+          ['Semana das Crianças', '2026-10-13', '2026-10-14', null, 'Pátio e Ginásio', 'Atividades recreativas, gincanas e oficinas comemorativas (13 e 14/10).'],
+          ['Seminário STEAM EN JEANS', '2026-10-14', null, '09:00 - 15:00', 'Laboratório Maker / STEAM', 'Apresentação de projetos interdisciplinares de Ciência, Tecnologia, Engenharia, Artes e Matemática.'],
+          ['Papo Responsa (Teatro FIRJAN SESI)', '2026-10-14', null, '14:00', 'Teatro FIRJAN SESI', 'Roda de diálogo sobre cidadania, protagonismo jovem e convivência ética.'],
+          ['Dia do Professor (Feriado Escolar)', '2026-10-15', null, null, 'Escola FIRJAN SESI', 'Recesso escolar em comemoração ao Dia dos Professores e Educadores.'],
+          ['Festival SESI Multicultural', '2026-10-17', null, '09:00 - 16:00', 'Escola FIRJAN SESI', 'Exposições artísticas, apresentações de dança, música e estandes culturais dos alunos.'],
+          ['Aulão ENEM (Teatro FIRJAN SESI)', '2026-10-20', null, '13:30 - 17:30', 'Teatro FIRJAN SESI', 'Mega intensivão com resolução comentada de questões e dicas de redação para o ENEM.'],
+          ['Janela de Aplicação do Avalia SESI II', '2026-10-27', '2026-10-30', null, 'Laboratórios de Informática e Salas', 'Período oficial de aplicação dos testes diagnósticos da rede (27 a 30/10).'],
+          ['Feriado Nacional – Finados', '2026-11-02', null, null, 'Feriado Nacional', 'Feriado Nacional de Finados (sem atividades letivas).'],
+          ['Feriado Nacional – Proclamação da República', '2026-11-15', null, null, 'Feriado Nacional', 'Comemoração cívica da Proclamação da República Brasileira.'],
+          ['Culminância da Consciência Negra (Teatro FIRJAN SESI)', '2026-11-18', '2026-11-19', null, 'Teatro FIRJAN SESI', 'Mostra cultural, painéis reflexivos e debates temáticos sobre a Consciência Negra (18 e 19/11).'],
+          ['Feriado Nacional – Dia Nacional de Zumbi e da Consciência Negra', '2026-11-20', null, null, 'Feriado Nacional', 'Feriado Nacional em celebração da ancestralidade e Consciência Negra.'],
+          ['Provas do 3º Trimestre', '2026-11-23', '2026-11-27', null, 'Salas de Aula', 'Semana de avaliações e provas finais do 3º Trimestre (23 a 27/11).'],
+          ['Amistoso – Esporte na Escola', '2026-11-28', null, '08:30 - 13:00', 'Ginásio Poliesportivo', 'Sábado esportivo com jogos amistosos de integração e confraternização.'],
+          ['Torneio SESI de Robótica (FLL)', '2026-12-03', '2026-12-04', '08:00 - 17:00', 'Arena FIRJAN SESI', 'Competição oficial de robótica FIRST LEGO League (03 e 04/12).'],
+          ['Recuperação Paralela – 3º Trimestre', '2026-12-08', '2026-12-10', null, 'Salas de Aula', 'Período de aulas de reforço e provas de recuperação do 3º Trimestre (08 a 10/12).'],
+          ['Festa das Letras (1º e 5º Ano) – Teatro FIRJAN SESI', '2026-12-09', '2026-12-10', null, 'Teatro FIRJAN SESI', 'Cerimônia especial de transição e celebração literária dos anos concluintes (09 e 10/12).'],
+          ['Término do 3º Trimestre', '2026-12-11', null, null, 'Escola FIRJAN SESI', 'Fechamento oficial das aulas regulares do 3º trimestre de 2026.'],
+          ['Conselho de Classe – 3º Trimestre (9º Ano e 3ª Série)', '2026-12-11', null, null, 'Sala dos Professores', 'Reunião de avaliação e aprovação final das turmas concluintes do Fundamental e Médio.'],
+          ['Recuperação Final', '2026-12-14', '2026-12-16', null, 'Salas de Aula', 'Plantão de estudos e aplicação das avaliações de Recuperação Final (14 a 16/12).'],
+          ['Arrumação e Montagem da Formatura', '2026-12-15', null, 'A partir das 18:00', 'Teatro FIRJAN SESI', 'Preparativos técnicos, iluminação e ambientação para a formatura solene.'],
+          ['Formatura do 9º Ano e da 3ª Série (Teatro FIRJAN SESI)', '2026-12-16', null, '19:00', 'Teatro FIRJAN SESI', 'Solenidade oficial de colação de grau dos formandos do Ensino Fundamental e Ensino Médio.'],
+          ['Cantata de Natal (Teatro FIRJAN SESI)', '2026-12-17', null, '18:30', 'Teatro FIRJAN SESI', 'Emocionante apresentação musical natalina com coral de alunos e professores.'],
+          ['Conselho de Classe – 3º Trimestre (Ensino Médio)', '2026-12-17', null, null, 'Sala dos Professores', 'Encerramento pedagógico e validação dos resultados do Ensino Médio.'],
+          ['Conselho de Classe – 3º Trimestre (Anos Iniciais e Anos Finais)', '2026-12-18', null, null, 'Sala dos Professores', 'Fechamento dos diários de classe e validação de aprovação dos Anos Iniciais e Finais.'],
+          ['Entrega dos Boletins', '2026-12-21', null, null, 'Secretaria Escolar / Portal', 'Disponibilização das notas finais no portal e atendimento aos responsáveis na secretaria.'],
+          ['Natal', '2026-12-25', null, null, 'Feriado Nacional', 'Celebração de Natal. Boas Festas a toda a comunidade escolar SESI!']
+        ];
+        for (const [title, date, endDate, time, location, description] of calendar) {
+          const key = `${String(title).trim().toLowerCase()}|${date}`;
+          if (existingKeys.has(key)) continue;
+          await pg.query(
+            `INSERT INTO events (title, date, end_date, time, location, category, description, status)
+             VALUES ($1,$2,$3,$4,$5,'Geral',$6,'agendado')`,
+            [title, date, endDate, time, location, description]
+          );
+        }
     })().catch((err) => {
       schemaReady = null;
       throw err;
@@ -299,11 +366,12 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
       const body = await readBody(req);
       if (!body.title || !body.date) return send(res, 400, { error: 'Titulo e data obrigatorios' });
       const { rows } = await pg.query(
-        `INSERT INTO events (title, date, time, location, category, description, status)
-         VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
+        `INSERT INTO events (title, date, end_date, time, location, category, description, status)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
         [
           body.title,
           body.date,
+          body.endDate || null,
           body.time || null,
           body.location || 'SESI Caxias',
           body.category || 'Geral',

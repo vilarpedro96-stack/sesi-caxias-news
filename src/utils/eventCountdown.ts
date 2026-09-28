@@ -29,20 +29,22 @@ export function daysUntilEvent(dateStr: string, now: Date = new Date()): number 
 export function isEventEnded(
   dateStr: string,
   status?: string,
-  now: Date = new Date()
+  now: Date = new Date(),
+  endDateStr?: string
 ): boolean {
   if (status === 'encerrado') return true;
-  const eventDay = parseLocalDate(dateStr);
-  if (!eventDay) return false;
-  eventDay.setHours(23, 59, 59, 999);
-  return eventDay < now;
+  const lastDay = parseLocalDate(endDateStr || dateStr);
+  if (!lastDay) return false;
+  lastDay.setHours(23, 59, 59, 999);
+  return lastDay < now;
 }
 
-export function getEventCountdown(dateStr: string, now: Date = new Date()) {
-  const diffDays = daysUntilEvent(dateStr, now);
-  if (diffDays === null) return null;
-
-  if (diffDays < 0) {
+export function getEventCountdown(
+  dateStr: string,
+  now: Date = new Date(),
+  endDateStr?: string
+) {
+  if (isEventEnded(dateStr, undefined, now, endDateStr)) {
     return {
       label: 'Encerrado',
       class:
@@ -50,7 +52,10 @@ export function getEventCountdown(dateStr: string, now: Date = new Date()) {
     };
   }
 
-  if (diffDays === 0) {
+  const diffDays = daysUntilEvent(dateStr, now);
+  if (diffDays === null) return null;
+
+  if (diffDays <= 0) {
     return {
       label: 'Hoje',
       class: 'bg-red-600 text-white font-black animate-pulse shadow-sm shadow-red-600/40'

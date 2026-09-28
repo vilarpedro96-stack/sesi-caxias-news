@@ -13,6 +13,7 @@ export interface SchoolEvent {
   id: number;
   title: string;
   date: string;
+  endDate?: string;
   time?: string;
   description?: string;
   location?: string;

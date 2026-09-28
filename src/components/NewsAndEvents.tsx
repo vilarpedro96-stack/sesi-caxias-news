@@ -52,8 +52,14 @@ export const NewsAndEvents: React.FC<NewsAndEventsProps> = ({
   }, [articles, selectedCategory]);
 
   const displayEvents = useMemo(() => {
-    const valid = (events || []).filter((event) => !isEventEnded(event.date, event.status, now));
-    return valid.slice(0, 4);
+    return (events || [])
+      .filter((event) => !isEventEnded(event.date, event.status, now, event.endDate))
+      .sort((a, b) => {
+        const da = parseLocalDate(a.date)?.getTime() ?? 0;
+        const db = parseLocalDate(b.date)?.getTime() ?? 0;
+        return da - db;
+      })
+      .slice(0, 4);
   }, [events, now]);
 
   // Helper to construct Google Calendar Add Event URL
@@ -75,7 +81,8 @@ export const NewsAndEvents: React.FC<NewsAndEventsProps> = ({
     return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&details=${details}&location=${location}${dateStr ? `&dates=${dateStr}` : ''}`;
   };
 
-  const getEventTimeStatus = (dateStr: string) => getEventCountdown(dateStr, now);
+  const getEventTimeStatus = (dateStr: string, endDate?: string) =>
+    getEventCountdown(dateStr, now, endDate);
 
   return (
     <div id="portal-main-feed" className="bg-neutral-50 dark:bg-neutral-950 transition-colors duration-200">
@@ -233,7 +240,7 @@ export const NewsAndEvents: React.FC<NewsAndEventsProps> = ({
                 const weekday = !isNaN(evtDate.getTime())
                   ? evtDate.toLocaleDateString('pt-BR', { weekday: 'short' }).replace('.', '').toUpperCase()
                   : '';
-                const status = getEventTimeStatus(evt.date);
+                const status = getEventTimeStatus(evt.date, evt.endDate);
 
                 return (
                   <div

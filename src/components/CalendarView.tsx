@@ -32,7 +32,8 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ events, onBack }) =>
     return t;
   }, [now]);
 
-  const isEventEncerrado = (evt: SchoolEvent) => isEventEnded(evt.date, evt.status, now);
+  const isEventEncerrado = (evt: SchoolEvent) =>
+    isEventEnded(evt.date, evt.status, now, evt.endDate);
 
   const { upcomingCount, pastCount } = useMemo(() => {
     let up = 0;
@@ -249,7 +250,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ events, onBack }) =>
                 {monthEvents.map((evt) => {
                   const evtDate = parseLocalDate(evt.date);
                   const isPast = isEventEncerrado(evt);
-                  const countdown = getEventCountdown(evt.date, now);
+                  const countdown = getEventCountdown(evt.date, now, evt.endDate);
                   const dayNum = evtDate ? evtDate.getDate() : '•';
                   const weekday = evtDate
                     ? evtDate
