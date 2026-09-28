@@ -214,7 +214,7 @@ async function ensureSchema() {
           SELECT id FROM (
             SELECT id,
                    ROW_NUMBER() OVER (
-                     PARTITION BY LOWER(TRIM(title)), LEFT(date, 10)
+                     PARTITION BY LOWER(TRIM(title)), TO_CHAR(date::timestamp, 'YYYY-MM-DD')
                      ORDER BY id ASC
                    ) AS rn
             FROM events
