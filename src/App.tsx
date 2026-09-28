@@ -221,13 +221,9 @@ export default function App() {
   };
 
   const handleUpdateAdminPassword = async (adminId: number, newPassword: string) => {
-    try {
-      await apiService.setupPassword(adminId, newPassword);
-    } catch (e) {
-      console.warn('Backend password setup error, saving locally:', e);
-    }
+    await apiService.setupPassword(adminId, newPassword);
     setAdmins((prev) =>
-      prev.map((a) => (a.id === adminId ? { ...a, password: newPassword, isPending: false } : a))
+      prev.map((a) => (a.id === adminId ? { ...a, password: null, isPending: false } : a))
     );
   };
 

@@ -84,13 +84,18 @@ function mapVideo(row: any) {
   };
 }
 
+function hasStoredPassword(row: any): boolean {
+  const stored = String(row?.password || row?.password_hash || '').trim();
+  return stored.length > 0;
+}
+
 function mapAdmin(row: any) {
   return {
     id: row.id,
     email: row.email,
     role: row.role || 'admin',
     password: null,
-    isPending: row.is_pending ?? true,
+    isPending: !hasStoredPassword(row),
   };
 }
 
@@ -340,7 +345,7 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
 
     if (path === '/admins' && method === 'GET') {
       const { rows } = await pg.query(
-        'SELECT id, email, role, is_pending FROM admins ORDER BY id ASC'
+        'SELECT id, email, role, is_pending, password, password_hash FROM admins ORDER BY id ASC'
       );
       return send(res, 200, rows.map(mapAdmin));
     }
@@ -385,15 +390,18 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
         return send(res, 404, { error: 'E-mail nao cadastrado como administrador.' });
       }
       const data = rows[0];
-      const stored = data.password || data.password_hash || null;
+      const stored = String(data.password || data.password_hash || '').trim();
       if (!stored) {
         return send(res, 200, {
           isPending: true,
-          admin: mapAdmin({ ...data, is_pending: true }),
+          admin: mapAdmin({ ...data, password: null, password_hash: null, is_pending: true }),
         });
       }
-      if (stored !== password) {
-        return send(res, 401, { error: 'Senha incorreta.' });
+      if (String(password || '') !== stored) {
+        return send(res, 401, { error: 'Senha incorreta. Use a senha ja cadastrada neste e-mail.' });
+      }
+      if (data.is_pending) {
+        await pg.query('UPDATE admins SET is_pending = false WHERE id = $1', [data.id]);
       }
       return send(res, 200, {
         isPending: false,
@@ -410,7 +418,7 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
         `UPDATE admins
          SET password = $1, password_hash = $1, is_pending = false
          WHERE id = $2
-         RETURNING id, email, role, is_pending`,
+         RETURNING id, email, role, is_pending, password, password_hash`,
         [body.password, body.adminId]
       );
       if (!rows.length) return send(res, 404, { error: 'Admin nao encontrado.' });

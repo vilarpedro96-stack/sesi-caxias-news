@@ -8,12 +8,11 @@ import { SesiLogo } from './SesiLogo';
 interface AdminLoginProps {
   admins: AdminUser[];
   onLoginSuccess: (admin: AdminUser) => void;
-  onUpdateAdminPassword: (adminId: number, newPassword: string) => void;
+  onUpdateAdminPassword: (adminId: number, newPassword: string) => Promise<void>;
   onBack: () => void;
 }
 
 export const AdminLogin: React.FC<AdminLoginProps> = ({
-  admins,
   onLoginSuccess,
   onUpdateAdminPassword,
   onBack
@@ -43,44 +42,28 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({
 
     setIsLoading(true);
     try {
-      // Try backend authentication
       const res = await apiService.login(cleanEmail, password).catch((err) => {
-        // Handle error message
         return { error: err.message || 'Falha ao autenticar' };
       });
 
-      // If pending first access setup
       if (res && 'isPending' in res && res.isPending && res.admin) {
         setCurrentAdmin(res.admin);
         setPassword('');
+        setConfirmPassword('');
         setStep('first_access');
-        toast.info('Primeiro acesso detectado! Por favor, cadastre sua senha de acesso.');
+        toast.info('Primeiro acesso: cadastre sua senha. Na proxima vez, use essa mesma senha.');
         return;
       }
 
-      // Successful login
-      if (res && 'admin' in res && res.admin) {
+      if (res && 'admin' in res && res.admin && !('error' in res)) {
         toast.success('Login realizado com sucesso!');
         onLoginSuccess(res.admin);
         return;
       }
 
-      // Local fallback check if backend returned error
-      const localAdmin = admins.find((a) => a.email.toLowerCase() === cleanEmail);
-      if (localAdmin) {
-        if (!localAdmin.password || localAdmin.isPending) {
-          setCurrentAdmin(localAdmin);
-          setPassword('');
-          setStep('first_access');
-          toast.info('Primeiro acesso detectado! Por favor, crie sua senha de acesso.');
-          return;
-        }
-
-        if (password === localAdmin.password || password === 'admin' || password === '123456') {
-          toast.success('Login realizado com sucesso!');
-          onLoginSuccess(localAdmin);
-          return;
-        }
+      if (res && 'error' in res && res.error) {
+        toast.error(String(res.error));
+        return;
       }
 
       toast.error('E-mail ou senha incorretos. Verifique suas credenciais.');
@@ -106,12 +89,11 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({
 
     setIsLoading(true);
     try {
-      await apiService.setupPassword(currentAdmin.id, password).catch(() => null);
-      onUpdateAdminPassword(currentAdmin.id, password);
-      toast.success('Senha definida com sucesso! Bem-vindo(a).');
+      await onUpdateAdminPassword(currentAdmin.id, password);
+      toast.success('Senha salva. Use este e-mail e esta senha nos proximos acessos.');
       onLoginSuccess({ ...currentAdmin, password, isPending: false });
     } catch {
-      toast.error('Não foi possível salvar a senha. Tente novamente.');
+      toast.error('Nao foi possivel salvar a senha no banco. Tente novamente.');
     } finally {
       setIsLoading(false);
     }
