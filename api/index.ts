@@ -61,11 +61,13 @@ function mapArticle(row: any) {
 }
 
 function mapEvent(row: any) {
+  const date = String(row.date || '').slice(0, 10);
+  const endDate = row.end_date ? String(row.end_date).slice(0, 10) : undefined;
   return {
     id: row.id,
     title: row.title,
-    date: row.date,
-    endDate: row.end_date || undefined,
+    date,
+    endDate,
     time: row.time || undefined,
     description: row.description || '',
     location: row.location || '',
@@ -206,9 +208,26 @@ async function ensureSchema() {
         );
       }
 
+      await pg.query(`
+        DELETE FROM events
+        WHERE id IN (
+          SELECT id FROM (
+            SELECT id,
+                   ROW_NUMBER() OVER (
+                     PARTITION BY LOWER(TRIM(title)), LEFT(date, 10)
+                     ORDER BY id ASC
+                   ) AS rn
+            FROM events
+          ) ranked
+          WHERE ranked.rn > 1
+        )
+      `);
+
       const existingEvents = await pg.query('SELECT title, date FROM events');
       const existingKeys = new Set(
-        existingEvents.rows.map((row: any) => `${String(row.title).trim().toLowerCase()}|${row.date}`)
+        existingEvents.rows.map(
+          (row: any) => `${String(row.title).trim().toLowerCase()}|${String(row.date).slice(0, 10)}`
+        )
       );
       const calendar = [
           ['Retorno às aulas após o recesso escolar', '2026-08-03', null, null, 'Escola FIRJAN SESI Duque de Caxias', 'Retorno de todos os estudantes e equipe pedagógica para o 2º semestre letivo.'],
@@ -262,7 +281,7 @@ async function ensureSchema() {
           ['Natal', '2026-12-25', null, null, 'Feriado Nacional', 'Celebração de Natal. Boas Festas a toda a comunidade escolar SESI!']
         ];
         for (const [title, date, endDate, time, location, description] of calendar) {
-          const key = `${String(title).trim().toLowerCase()}|${date}`;
+          const key = `${String(title).trim().toLowerCase()}|${String(date).slice(0, 10)}`;
           if (existingKeys.has(key)) continue;
           await pg.query(
             `INSERT INTO events (title, date, end_date, time, location, category, description, status)
